@@ -1,7 +1,10 @@
 import pygame as pg
 from pygame.locals import *
 import sys
-from Scene import *
+#from Scene import *
+import MenuScene
+
+MS = MenuScene.MenuScene
 
 
 class Board_Game_Master():
