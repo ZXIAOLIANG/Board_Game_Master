@@ -12,7 +12,7 @@ class Scene:
 
     def Draw(self, screen):
         pass
-
+    
     def ChangeNext(self, next_scene):
         self.next_scene = next_scene
     
@@ -39,7 +39,8 @@ class TicTacToeScene(Scene):
         self.new_x = 0
         self.new_y = 0
         self.result = "Playing"
-        self.Draw(screen)
+        self.steps = 0
+        # self.Draw(screen)
 
     def HandleEvents(self, events):
         for event in events:
@@ -51,7 +52,7 @@ class TicTacToeScene(Scene):
                     self.ChangeNext(MenuScene(self.screen))
                 elif self.pause_but_rect.collidepoint(mouse_pos):
                     print("game paused")
-                    self.ChangeNext(PauseScene(self.screen, self.board, self.current_player))
+                    self.ChangeNext(PauseScene(self.screen, self.board, self.current_player, "TicTacToe"))
                 elif self.restart_but_rect.collidepoint(mouse_pos):
                     print("game restart")
                     self.reset()
@@ -79,13 +80,14 @@ class TicTacToeScene(Scene):
             self.new_step = True
             self.new_x = x_index
             self.new_y = y_index
+            self.steps += 1
             if self.current_player == 1:
                 self.board[x_index][y_index] = True
             else:
                 self.board[x_index][y_index] = False
             self.result = self.check_win()
             if self.result != "Playing":
-                self.ChangeNext(ResultScene(self.screen, self.result))
+                self.ChangeNext(ResultScene(self.screen, self.result, "TicTacToe"))
 
     def reset(self):
         self.current_player = 1
@@ -93,31 +95,32 @@ class TicTacToeScene(Scene):
         self.redraw = True
 
     def check_win(self):
-        for row in range(3):
-            if self.board[row][0] is not None and self.board[row][0] == self.board[row][1] == self.board[row][2]:
-                return "Player " + str(self.current_player) + " win!"
-
-        for col in range(3):
-            if self.board[0][col] is not None and self.board[0][col] == self.board[1][col] == self.board[2][col]:
-                return "Player " + str(self.current_player) + " win!"
-
-        if self.board[0][0] is not None and self.board[0][0] == self.board[1][1] == self.board[2][2]:
+        last_move_color = self.board[self.new_x][self.new_y]
+        connected_pieces = check_horizontal_connection(self.board, last_move_color, self.new_x, self.new_y, 3, 3)
+        if connected_pieces >= 3:
             return "Player " + str(self.current_player) + " win!"
 
-        if self.board[0][2] is not None and self.board[0][2] == self.board[1][1] == self.board[2][0]:
+        connected_pieces = check_vertical_connection(self.board, last_move_color, self.new_x, self.new_y, 3, 3)
+        if connected_pieces >= 3:
             return "Player " + str(self.current_player) + " win!"
-        # check for draw condition
-        draw_condition = True
-        for x in range(3):
-            for y in range(3):
-                if self.board[x][y] is None:
-                    draw_condition = False
-        if draw_condition:
-            return "Draw!"
+
+        connected_pieces = check_main_diagnal_connection(self.board, last_move_color, self.new_x, self.new_y, 3, 3)
+        if connected_pieces >= 3:
+            return "Player " + str(self.current_player) + " win!"
+
+        connected_pieces = check_inverse_diagnal_connection(self.board, last_move_color, self.new_x, self.new_y, 3, 3)
+        if connected_pieces >= 3:
+            return "Player " + str(self.current_player) + " win!"
+        
+        # check for draws
+        if self.steps == 3*3:
+            return "Draw"
+        print("yes")
         return "Playing"
 
     def draw_game(self, screen):
-        screen.fill((255,255,255))
+        screen.fill((255,255,255)) # fill the whole window with white: remove the previous scene
+        screen.fill((222,184,135), (0, 0, 600, 600))
         pg.draw.line(screen,(0,0,0),(0,0),(0, self.board_size),7)
         pg.draw.line(screen,(0,0,0),(self.board_size/3,0),(self.board_size/3, self.board_size),7)
         pg.draw.line(screen,(0,0,0),(self.board_size/3*2,0),(self.board_size/3*2, self.board_size),7)
@@ -185,6 +188,158 @@ class TicTacToeScene(Scene):
             self.update_instruction(screen)
             self.new_step = False
 
+class GomokuScene(Scene):
+    def __init__(self, screen, board=[[None]*15 for _ in range(15)], current_player=1, board_size=600):
+        Scene.__init__(self)
+        self.back_but_rect = None
+        self.pause_but_rect = None
+        self.restart_but_rect = None
+        self.board_rect = None
+        self.screen = screen
+        self.board = board
+        self.current_player = current_player
+        self.board_size = board_size
+        x_image = pg.image.load('black600.png')
+        o_image = pg.image.load('white600.png')
+        self.x_img = pg.transform.scale(x_image, (30,30))
+        self.o_img = pg.transform.scale(o_image, (30,30))
+        self.redraw = True
+        self.new_step = False
+        self.new_x = 0
+        self.new_y = 0
+        self.result = "Playing"
+        self.steps = 0
+        # self.Draw(screen)
+
+    def HandleEvents(self, events):
+        for event in events:
+            if event.type == MOUSEBUTTONDOWN:
+                print("mouse clicked")
+                mouse_pos = pg.mouse.get_pos()
+                if self.back_but_rect.collidepoint(mouse_pos):
+                    print("back to menu")
+                    self.ChangeNext(MenuScene(self.screen))
+                elif self.pause_but_rect.collidepoint(mouse_pos):
+                    print("game paused")
+                    self.ChangeNext(PauseScene(self.screen, self.board, self.current_player, "Gomoku"))
+                elif self.restart_but_rect.collidepoint(mouse_pos):
+                    print("game restart")
+                    self.reset()
+                elif self.board_rect.collidepoint(mouse_pos):
+                    self.check_step(mouse_pos)
+
+    def check_step(self, mouse_pos):
+        x, y = mouse_pos
+        if x != 600:
+            x_index = x//40
+        else:
+            x_index = 14
+        if y!= 600:
+            y_index = y//40
+        else:
+            y_index = 14
+
+        if self.board[x_index][y_index] is None:
+            # new step
+            self.new_step = True
+            self.steps += 1
+            self.new_x = x_index
+            self.new_y = y_index
+            if self.current_player == 1:
+                self.board[x_index][y_index] = True
+            else:
+                self.board[x_index][y_index] = False
+            self.result = self.check_win()
+            if self.result != "Playing":
+                self.ChangeNext(ResultScene(self.screen, self.result, "Gomoku"))
+
+    def reset(self):
+        self.current_player = 1
+        self.board = [[None]*15 for _ in range(15)]
+        self.redraw = True
+
+    def check_win(self):
+        last_move_color = self.board[self.new_x][self.new_y]
+        connected_pieces = check_horizontal_connection(self.board, last_move_color, self.new_x, self.new_y, 5, 15)
+        if connected_pieces >= 5:
+            return "Player " + str(self.current_player) + " win!"
+
+        connected_pieces = check_vertical_connection(self.board, last_move_color, self.new_x, self.new_y, 5, 15)
+        if connected_pieces >= 5:
+            return "Player " + str(self.current_player) + " win!"
+
+        connected_pieces = check_main_diagnal_connection(self.board, last_move_color, self.new_x, self.new_y, 5, 15)
+        if connected_pieces >= 5:
+            return "Player " + str(self.current_player) + " win!"
+
+        connected_pieces = check_inverse_diagnal_connection(self.board, last_move_color, self.new_x, self.new_y, 5, 15)
+        if connected_pieces >= 5:
+            return "Player " + str(self.current_player) + " win!"
+        
+        # check for draw
+        if self.steps == 15*15:
+            return "Draw"
+        
+        return "Playing"
+
+    def draw_game(self, screen):
+        screen.fill((255,255,255)) # fill the whole window with white: remove the previous scene
+        screen.fill((222,184,135), (0, 0, 600, 600))
+        for i in range(15):
+            pg.draw.line(screen,(0,0,0),(20,20+40*i),(580, 20+40*i),5)
+            pg.draw.line(screen,(0,0,0),(20+40*i,20),(20+40*i, 580),5)
+
+        self.board_rect = pg.Rect(0,0,600,600)
+
+        font = pg.font.Font(None, 50)
+        self.pause_but_rect = draw_button(font, "PAUSE", screen, (255,0,0), (self.board_size+150, 150), self.board_size, 100, 300, 100)
+        self.back_but_rect = draw_button(font, "BACK", screen, (220,220,220), (self.board_size+150, 250), self.board_size, 200, 300, 100)
+        self.restart_but_rect = draw_button(font, "RESTART", screen, (220,220,0), (self.board_size+150, 350), self.board_size, 300, 300, 100)
+
+        # display instruction
+        screen.fill ((255, 255, 255), (self.board_size+4, 0, 300,100))
+        font2 = pg.font.Font(None, 30)
+        instruction = font2.render("Player " + str(self.current_player) + "'s turn", 1, (0, 0, 0))
+        inst_rect = instruction.get_rect(center=(self.board_size+150, 50))
+        screen.blit(instruction, inst_rect)
+
+    def update_instruction(self, screen):
+        if self.current_player == 1:
+            self.current_player = 2
+        elif self.current_player == 2:
+            self.current_player = 1
+
+        screen.fill ((255, 255, 255), (self.board_size+4, 0, 300,100))
+        font2 = pg.font.Font(None, 30)
+        instruction = font2.render("Player " + str(self.current_player) + "'s turn", 1, (0, 0, 0))
+        inst_rect = instruction.get_rect(center=(self.board_size+150, 50))
+        screen.blit(instruction, inst_rect)
+
+    def draw_step(self, screen):
+        if self.current_player == 1:
+            screen.blit(self.x_img,(self.new_x*40+5, self.new_y*40+5))
+        else:
+            screen.blit(self.o_img,(self.new_x*40+5, self.new_y*40+5))
+
+    def draw_previous_steps(self, screen):
+        for x_index in range(15):
+            for y_index  in range(15):
+                if self.board[x_index][y_index] == True:
+                    screen.blit(self.x_img,(x_index*40+5, y_index*40+5))
+                elif self.board[x_index][y_index] == False:
+                    screen.blit(self.o_img,(x_index*40+5, y_index*40+5))
+
+    def Draw(self, screen):
+        if self.redraw == True:
+            print("redraw")
+            self.draw_game(screen)
+            self.draw_previous_steps(screen)
+            self.redraw = False
+        if self.new_step == True:
+            print("new step")
+            self.draw_step(screen)
+            self.update_instruction(screen)
+            self.new_step = False
         # pg.display.update()
 class SelectGameScene(Scene):
     def __init__(self, screen):
@@ -194,7 +349,7 @@ class SelectGameScene(Scene):
         self.options = ["Tic Tac Toe", "Gomoku"]
         self.option_but_list = []
         self.hovered_option = -1
-        self.Draw(screen)
+        # self.Draw(screen)
 
     def HandleEvents(self, events):
         mouse_pos = pg.mouse.get_pos()
@@ -208,9 +363,12 @@ class SelectGameScene(Scene):
             if event.type == MOUSEBUTTONDOWN:
                 option_clicked = False
                 for i, option_but in enumerate(self.option_but_list):
-                    if option_but.collidepoint(mouse_pos):
+                    if option_but.collidepoint(mouse_pos) and i==0:
                         option_clicked = True
                         self.ChangeNext(TicTacToeScene(self.screen, [[None]*3 for _ in range(3)], 1))
+                    elif option_but.collidepoint(mouse_pos) and i==1:
+                        option_clicked = True
+                        self.ChangeNext(GomokuScene(self.screen, [[None]*15 for _ in range(15)], 1))
                 if option_clicked == False:
                     self.ChangeNext(MenuScene(self.screen))
                     
@@ -243,7 +401,7 @@ class MenuScene(Scene):
         self.redraw = True
         self.start_but_rect = None
         self.screen = screen 
-        self.Draw(screen)
+        # self.Draw(screen)
 
     def HandleEvents(self, events):
         for event in events:
@@ -272,20 +430,24 @@ class MenuScene(Scene):
             self.redraw = False
 
 class ResultScene(Scene):
-    def __init__(self, screen, result):
+    def __init__(self, screen, result, game):
         Scene.__init__(self)
         self.redraw = True
         self.result_message_rect = None
         self.screen = screen 
         self.result = result
-        self.Draw(screen)
+        self.game = game
+        # self.Draw(screen)
 
     def HandleEvents(self, events):
         for event in events:
             if event.type == MOUSEBUTTONDOWN:
                 mouse_pos = pg.mouse.get_pos()
                 if self.result_message_rect.collidepoint(mouse_pos):
-                    self.ChangeNext(TicTacToeScene(self.screen, [[None]*3 for _ in range(3)], 1))
+                    if self.game == "TicTacToe":
+                        self.ChangeNext(TicTacToeScene(self.screen, [[None]*3 for _ in range(3)], 1))
+                    elif self.game == "Gomoku":
+                        self.ChangeNext(GomokuScene(self.screen, [[None]*15 for _ in range(15)], 1))
 
     def draw_result(self, screen):
         font = pg.font.Font(None, 50)
@@ -301,21 +463,25 @@ class ResultScene(Scene):
             self.redraw = False
 
 class PauseScene(Scene):
-    def __init__(self, screen, board, current_player):
+    def __init__(self, screen, board, current_player, game):
         Scene.__init__(self)
         self.redraw = True
         self.pause_message_rect = None
         self.screen = screen 
         self.board = board
         self.current_player = current_player
-        self.Draw(screen)
+        self.game = game
+        # self.Draw(screen)
 
     def HandleEvents(self, events):
         for event in events:
             if event.type == MOUSEBUTTONDOWN:
                 mouse_pos = pg.mouse.get_pos()
                 if self.pause_message_rect.collidepoint(mouse_pos):
-                    self.ChangeNext(TicTacToeScene(self.screen, self.board, self.current_player))
+                    if self.game == "TicTacToe":
+                        self.ChangeNext(TicTacToeScene(self.screen, self.board, self.current_player))
+                    elif self.game == "Gomoku":
+                        self.ChangeNext(GomokuScene(self.screen, self.board,self.current_player))
 
     def draw_pause(self, screen):
         font = pg.font.Font(None, 50)
