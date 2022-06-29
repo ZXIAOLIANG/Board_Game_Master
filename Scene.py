@@ -19,28 +19,82 @@ class Scene:
     def Terminate(self):
         self.ChangeNext(None)
 
-class TicTacToeScene(Scene):
-    def __init__(self, screen, board=[[None]*3 for _ in range(3)], current_player=1, board_size=600):
+class GameScene(Scene):
+    def __init__(self, screen, line_width, board_offset, block_count, current_player=1, board_size=600):
         Scene.__init__(self)
-        self.back_but_rect = None
-        self.pause_but_rect = None
-        self.restart_but_rect = None
-        self.board_rect = None
         self.screen = screen
-        self.board = board
+        self.pause_but_rect = None
+        self.back_but_rect = None
+        self.restart_but_rect = None
         self.current_player = current_player
+        self.line_width = line_width
+        self.board_offset = board_offset
+        self.block_count = block_count
         self.board_size = board_size
-        x_image = pg.image.load('x.png')
-        o_image = pg.image.load('o.png')
-        self.x_img = pg.transform.scale(x_image, (100,100))
-        self.o_img = pg.transform.scale(o_image, (100,100))
         self.redraw = True
         self.new_step = False
         self.new_x = 0
         self.new_y = 0
         self.result = "Playing"
         self.steps = 0
-        # self.Draw(screen)
+
+    def draw_game(self, screen):
+        screen.fill((255,255,255)) # fill the whole window with white: remove the previous scene
+        screen.fill((222,184,135), (0, 0, self.board_size, self.board_size))
+
+        block_size = calculate_block_size(self.board_size, self.board_offset, self.block_count)
+
+        for i in range(self.block_count+1):
+            pg.draw.line(screen, (0, 0, 0), (self.board_offset, self.board_offset + block_size * i), (self.board_size - self.board_offset, self.board_offset + block_size * i), self.line_width)
+            pg.draw.line(screen, (0, 0, 0), (self.board_offset + block_size * i, self.board_offset), (self.board_offset + block_size * i, self.board_size - self.board_offset), self.line_width)
+        
+        self.board_rect = pg.Rect(0,0,self.board_size,self.board_size)
+
+        font = pg.font.Font(None, 50)
+        self.pause_but_rect = draw_button(font, "PAUSE", screen, (255,0,0), (self.board_size+150, 150), self.board_size+self.line_width, 100, 300, 100)
+        self.back_but_rect = draw_button(font, "BACK", screen, (220,220,220), (self.board_size+150, 250), self.board_size+self.line_width, 200, 300, 100)
+        self.restart_but_rect = draw_button(font, "RESTART", screen, (220,220,0), (self.board_size+150, 350), self.board_size+self.line_width, 300, 300, 100)
+
+        # display instruction
+        screen.fill ((255, 255, 255), (self.board_size+4, 0, 300,100))
+        font2 = pg.font.Font(None, 30)
+        instruction = font2.render("Player " + str(self.current_player) + "'s turn", 1, (0, 0, 0))
+        inst_rect = instruction.get_rect(center=(self.board_size+150, 50))
+        screen.blit(instruction, inst_rect)
+
+    def update_instruction(self, screen):
+        if self.current_player == 1:
+            self.current_player = 2
+        elif self.current_player == 2:
+            self.current_player = 1
+
+        screen.fill ((255, 255, 255), (self.board_size+4, 0, 300,100))
+        font2 = pg.font.Font(None, 30)
+        instruction = font2.render("Player " + str(self.current_player) + "'s turn", 1, (0, 0, 0))
+        inst_rect = instruction.get_rect(center=(self.board_size+150, 50))
+        screen.blit(instruction, inst_rect)    
+
+    def Draw(self, screen):
+        if self.redraw == True:
+            print("redraw")
+            self.draw_game(screen)
+            self.draw_previous_steps(screen)
+            self.redraw = False
+        if self.new_step == True:
+            print("new step")
+            self.draw_step(screen)
+            self.update_instruction(screen)
+            self.new_step = False
+
+class TicTacToeScene(GameScene):
+    def __init__(self, screen, board=[[None]*3 for _ in range(3)], current_player=1):
+        GameScene.__init__(self, screen, 7, 0, 3, current_player)
+        self.board_rect = None
+        self.board = board
+        x_image = pg.image.load('x.png')
+        o_image = pg.image.load('o.png')
+        self.x_img = pg.transform.scale(x_image, (100,100))
+        self.o_img = pg.transform.scale(o_image, (100,100))
 
     def HandleEvents(self, events):
         for event in events:
@@ -61,18 +115,14 @@ class TicTacToeScene(Scene):
 
     def check_step(self, mouse_pos):
         x, y = mouse_pos
-        if x < self.board_size/3:
-            x_index = 0
-        elif x < self.board_size*2/3:
-            x_index = 1
-        elif x <= self.board_size:
+        if x != 600:
+            x_index = x // 200
+        else:
             x_index = 2
-
-        if y < self.board_size/3:
-            y_index = 0
-        elif y < self.board_size*2/3:
-            y_index = 1
-        elif y <= self.board_size:
+        
+        if y != 600:
+            y_index = y // 200
+        else:
             y_index = 2
 
         if self.board[x_index][y_index] is None:
@@ -118,50 +168,6 @@ class TicTacToeScene(Scene):
         print("yes")
         return "Playing"
 
-    def draw_game(self, screen):
-        screen.fill((255,255,255)) # fill the whole window with white: remove the previous scene
-        screen.fill((222,184,135), (0, 0, 600, 600))
-        pg.draw.line(screen,(0,0,0),(0,0),(0, self.board_size),7)
-        pg.draw.line(screen,(0,0,0),(self.board_size/3,0),(self.board_size/3, self.board_size),7)
-        pg.draw.line(screen,(0,0,0),(self.board_size/3*2,0),(self.board_size/3*2, self.board_size),7)
-        pg.draw.line(screen,(0,0,0),(self.board_size,0),(self.board_size, self.board_size),7)
-        # Drawing horizontal lines
-        pg.draw.line(screen,(0,0,0),(0,0),(self.board_size, 0),7)
-        pg.draw.line(screen,(0,0,0),(0,self.board_size/3),(self.board_size, self.board_size/3),7)
-        pg.draw.line(screen,(0,0,0),(0,self.board_size/3*2),(self.board_size, self.board_size/3*2),7)
-        pg.draw.line(screen,(0,0,0),(0,self.board_size),(self.board_size, self.board_size),7)
-        self.board_rect = pg.Rect(0,0,600,600)
-
-        font = pg.font.Font(None, 50)
-        self.pause_but_rect = draw_button(font, "PAUSE", screen, (255,0,0), (self.board_size+150, 150), self.board_size+4, 100, 300, 100)
-        self.back_but_rect = draw_button(font, "BACK", screen, (220,220,220), (self.board_size+150, 250), self.board_size+4, 200, 300, 100)
-        self.restart_but_rect = draw_button(font, "RESTART", screen, (220,220,0), (self.board_size+150, 350), self.board_size+4, 300, 300, 100)
-
-        # restart = font.render("RESTART", 1, (0, 0, 0))
-        # restart_rect = restart.get_rect(center=(self.board_size+150, 350))
-        # self.restart_but_rect = pg.Rect(self.board_size+4, 300, 300,100)
-        # pg.draw.rect(screen, (220,220,0), self.restart_but_rect)
-        # screen.blit(restart, restart_rect)
-
-        # display instruction
-        screen.fill ((255, 255, 255), (self.board_size+4, 0, 300,100))
-        font2 = pg.font.Font(None, 30)
-        instruction = font2.render("Player " + str(self.current_player) + "'s turn", 1, (0, 0, 0))
-        inst_rect = instruction.get_rect(center=(self.board_size+150, 50))
-        screen.blit(instruction, inst_rect)
-
-    def update_instruction(self, screen):
-        if self.current_player == 1:
-            self.current_player = 2
-        elif self.current_player == 2:
-            self.current_player = 1
-
-        screen.fill ((255, 255, 255), (self.board_size+4, 0, 300,100))
-        font2 = pg.font.Font(None, 30)
-        instruction = font2.render("Player " + str(self.current_player) + "'s turn", 1, (0, 0, 0))
-        inst_rect = instruction.get_rect(center=(self.board_size+150, 50))
-        screen.blit(instruction, inst_rect)
-
     def draw_step(self, screen):
         if self.current_player == 1:
             screen.blit(self.x_img,(self.new_x*200+50, self.new_y*200+50))
@@ -176,40 +182,16 @@ class TicTacToeScene(Scene):
                 elif self.board[x_index][y_index] == False:
                     screen.blit(self.o_img,(x_index*200+50, y_index*200+50))
 
-    def Draw(self, screen):
-        if self.redraw == True:
-            print("redraw")
-            self.draw_game(screen)
-            self.draw_previous_steps(screen)
-            self.redraw = False
-        if self.new_step == True:
-            print("new step")
-            self.draw_step(screen)
-            self.update_instruction(screen)
-            self.new_step = False
-
-class GomokuScene(Scene):
-    def __init__(self, screen, board=[[None]*15 for _ in range(15)], current_player=1, board_size=600):
-        Scene.__init__(self)
-        self.back_but_rect = None
-        self.pause_but_rect = None
-        self.restart_but_rect = None
+class GomokuScene(GameScene):
+    def __init__(self, screen, board=[[None]*15 for _ in range(15)], current_player=1):
+        GameScene.__init__(self, screen, 5, 20, 14, 1)
         self.board_rect = None
-        self.screen = screen
         self.board = board
         self.current_player = current_player
-        self.board_size = board_size
         x_image = pg.image.load('black600.png')
         o_image = pg.image.load('white600.png')
         self.x_img = pg.transform.scale(x_image, (30,30))
         self.o_img = pg.transform.scale(o_image, (30,30))
-        self.redraw = True
-        self.new_step = False
-        self.new_x = 0
-        self.new_y = 0
-        self.result = "Playing"
-        self.steps = 0
-        # self.Draw(screen)
 
     def HandleEvents(self, events):
         for event in events:
@@ -230,14 +212,16 @@ class GomokuScene(Scene):
 
     def check_step(self, mouse_pos):
         x, y = mouse_pos
-        if x != 600:
-            x_index = x//40
+        block_size = calculate_block_size(self.board_size, self.board_offset, self.block_count)
+
+        if x != self.board_size:
+            x_index = int(x// block_size)
         else:
-            x_index = 14
+            x_index = int(self.block_count)
         if y!= 600:
-            y_index = y//40
+            y_index = int(y//block_size)
         else:
-            y_index = 14
+            y_index = int(self.block_count)
 
         if self.board[x_index][y_index] is None:
             # new step
@@ -282,39 +266,6 @@ class GomokuScene(Scene):
         
         return "Playing"
 
-    def draw_game(self, screen):
-        screen.fill((255,255,255)) # fill the whole window with white: remove the previous scene
-        screen.fill((222,184,135), (0, 0, 600, 600))
-        for i in range(15):
-            pg.draw.line(screen,(0,0,0),(20,20+40*i),(580, 20+40*i),5)
-            pg.draw.line(screen,(0,0,0),(20+40*i,20),(20+40*i, 580),5)
-
-        self.board_rect = pg.Rect(0,0,600,600)
-
-        font = pg.font.Font(None, 50)
-        self.pause_but_rect = draw_button(font, "PAUSE", screen, (255,0,0), (self.board_size+150, 150), self.board_size, 100, 300, 100)
-        self.back_but_rect = draw_button(font, "BACK", screen, (220,220,220), (self.board_size+150, 250), self.board_size, 200, 300, 100)
-        self.restart_but_rect = draw_button(font, "RESTART", screen, (220,220,0), (self.board_size+150, 350), self.board_size, 300, 300, 100)
-
-        # display instruction
-        screen.fill ((255, 255, 255), (self.board_size+4, 0, 300,100))
-        font2 = pg.font.Font(None, 30)
-        instruction = font2.render("Player " + str(self.current_player) + "'s turn", 1, (0, 0, 0))
-        inst_rect = instruction.get_rect(center=(self.board_size+150, 50))
-        screen.blit(instruction, inst_rect)
-
-    def update_instruction(self, screen):
-        if self.current_player == 1:
-            self.current_player = 2
-        elif self.current_player == 2:
-            self.current_player = 1
-
-        screen.fill ((255, 255, 255), (self.board_size+4, 0, 300,100))
-        font2 = pg.font.Font(None, 30)
-        instruction = font2.render("Player " + str(self.current_player) + "'s turn", 1, (0, 0, 0))
-        inst_rect = instruction.get_rect(center=(self.board_size+150, 50))
-        screen.blit(instruction, inst_rect)
-
     def draw_step(self, screen):
         if self.current_player == 1:
             screen.blit(self.x_img,(self.new_x*40+5, self.new_y*40+5))
@@ -329,18 +280,6 @@ class GomokuScene(Scene):
                 elif self.board[x_index][y_index] == False:
                     screen.blit(self.o_img,(x_index*40+5, y_index*40+5))
 
-    def Draw(self, screen):
-        if self.redraw == True:
-            print("redraw")
-            self.draw_game(screen)
-            self.draw_previous_steps(screen)
-            self.redraw = False
-        if self.new_step == True:
-            print("new step")
-            self.draw_step(screen)
-            self.update_instruction(screen)
-            self.new_step = False
-        # pg.display.update()
 class SelectGameScene(Scene):
     def __init__(self, screen):
         Scene.__init__(self)
